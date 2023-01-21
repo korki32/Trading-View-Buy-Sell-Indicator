@@ -1,0 +1,87 @@
+//@version=5
+indicator(title="Korki Startegy", shorttitle="KRFX", overlay=true, max_lines_count=500)
+parabolicsarcheckbox = input.bool(true, "ParabolicSAR ON/OFF", group = "What would you like to see on the chart?")
+demacheckbox = input.bool(true, "DEMA ON/OFF", group = "What would you like to see on the chart?")
+bbcheckbox = input.bool(true, "Bollinger Bands ON/OFF", group = "What would you like to see on the chart?")
+stclinescheckbox = input.bool(true, "Super Trend Channels ON/OFF", group = "What would you like to see on the chart?")
+stcsignalscheckbox = input.bool(true, "Buy/Sell Signals ON/OFF", group = "What would you like to see on the chart?")
+//***********************************PARABOLIC SAR**************************************
+start = input(0.02, group = "ParabolicSAR")
+increment = input(0.02, group = "ParabolicSAR")
+maximum = input(0.2, "Max Value", group = "ParabolicSAR")
+out = ta.sar(start, increment, maximum)
+plot(parabolicsarcheckbox ? out : na, title="ParabolicSAR",  style=plot.style_cross, color=#FFEB3B, linewidth = 1)
+
+//********************************SUPERTREND CHANNELS***********************************
+length = input(18, group = "SuperTrend Channel")
+mult   = input(5, group = "SuperTrend Channel")
+upper = 0.,lower = 0.,os = 0,max = 0.,min = 0.
+
+src = close
+atr = ta.atr(length)*mult
+up = hl2 + atr
+dn = hl2 - atr
+upper := src[1] < upper[1] ? math.min(up,upper[1]) : up
+lower := src[1] > lower[1] ? math.max(dn,lower[1]) : dn
+
+os := src > upper ? 1 : src < lower ? 0 : os[1]
+spt = os == 1 ? lower : upper
+
+max := ta.cross(src,spt) ? nz(math.max(max[1],src),src) : 
+  os == 1 ? math.max(src,max[1]) : 
+  math.min(spt,max[1])
+
+min := ta.cross(src,spt) ? nz(math.min(min[1],src),src) : 
+  os == 0 ? math.min(src,min[1]) : 
+  math.max(spt,min[1])
+
+avg = math.avg(max,min)
+
+var area_up_col  = color.new(#0cb51a,80)
+var area_dn_col = color.new(#ff1100,80)
+plot0 = plot(stclinescheckbox ? max : na,'STC Upper Channel'
+  ,max != max[1] and os == 1 ? na : #0cb51a)
+plot1 = plot(stclinescheckbox ? avg : na,'STC Average'
+  ,#ff5d00)
+plot2 = plot(stclinescheckbox ? min : na,'STC Lower Channel'
+  ,min != min[1] and os == 0 ? na : #ff1100)
+
+fill(plot0,plot1,area_up_col,'STC Upper Area')
+fill(plot1,plot2,area_dn_col,'STC Lower Area')
+
+//Alert when realse new buy or sell signal
+alertcondition(max,"Upper Channel Breakout","🚨{{ticker}}, 15M 🚨 🔴SELL")
+alertcondition(min,"Lower Channel Breakout","🚨{{ticker}}, 15M 🚨 🟢BUY")
+
+//Buy-Sell Signal
+lowbreak =  if(ta.crossover(src,min))
+    1
+else
+    0
+plotshape(stcsignalscheckbox ? lowbreak : na, style = shape.labelup, location = location.belowbar, text = "B", color =#0cb51a, title = "STC Lower Break", textcolor = color.white)
+
+upbreak = if(ta.crossunder(src,max))
+    1
+else
+    0
+plotshape(stcsignalscheckbox ? upbreak : na, style = shape.labeldown, location = location.abovebar, text = "S", color =#ff1100, title = "STC Upper Break", textcolor = color.white)
+
+//**************************Bollinger Bands**********************************
+length2 = input.int(200, minval=1, group = "Bollinger Bands", title = "Length")
+src2 = input(hlc3, title="Source", group = "Bollinger Bands")
+mult2 = input.float(3.0, minval=0.001, maxval=50, title="StdDev", group = "Bollinger Bands")
+basis2 = ta.sma(src2, length2)
+dev2 = mult2 * ta.stdev(src2, length2)
+upper2 = basis2 + dev2
+lower2 = basis2 - dev2
+offset = input.int(0, "Offset", minval = -500, maxval = 500, group = "Bollinger Bands")
+p1 = plot(bbcheckbox ? upper2 : na, "BB Upper", color=#9C27B0, offset = offset,style = plot.style_line, linewidth = 2)
+p2 = plot(bbcheckbox ? lower2 : na, "BB Lower", color=#9C27B0, offset = offset, style = plot.style_line, linewidth = 2)
+
+//**************************DEMA**********************************
+length3 = input.int(21, minval=1, group = "DEMA", title = "Length")
+src3 = input(close, title="Source", group = "DEMA")
+e1 = ta.ema(src, length)
+e2 = ta.ema(e1, length)
+dema = 2 * e1 - e2
+plot(demacheckbox ? dema : na, "DEMA", color=#FFFFFF, style = plot.style_linebr)
